@@ -1,0 +1,9 @@
+# Config changes format version 1.0
+# created by u-center version 25.06 at 17:26:36 on Monday, 15 Dec 2025
+[del]
+[set]
+Flash CFG-TP-TP1_ENA       0                    # write value 0                    to item id 0x10050007 in layer 1
+Flash CFG-PM-OPERATEMODE   1                    # write value 1 - PSMOO            to item id 0x20d00001 in layer 1
+Flash CFG-NAVSPG-DYNMODEL  6                    # write value 6 - AIR1             to item id 0x20110021 in layer 1
+Flash CFG-PM-EXTINTBACKUP  1                    # write value 1                    to item id 0x10d0000d in layer 1
+Flash CFG-PM-EXTINTINACTIVE 1                    # write value 1                    to item id 0x10d0000e in layer 1
