@@ -6,6 +6,7 @@ import numpy as np
 import time
 R = 8.314472 #ideal gas constant
 mwAtmo = 28.013e-3 #kg/mol
+modElasticMylar = 4e6 #Pa
 
 class Balloon:
     def __init__(self,volume,mass,molWeightLiftingGas,mols,burstPressure):
@@ -16,28 +17,28 @@ class Balloon:
         self.burstPressure = burstPressure
 
 
-balloon = Balloon(0.281156,47e-3+37e-3,4.002602e-3,3.81438441,3000)
+balloon = Balloon(0.281156,47e-3+37e-3,4.002602e-3,3.6,3000)
 
-endTime = 50000 #seconds
+endTime = 10000 #seconds
 timeStep = 1 #second
 
 t=[0]
 burstTime = 0
-altitude = [0]
+altitude = [10000]
 atmo = Atmosphere(altitude[-1])
-velocity = [0]
+velocity = [0.1]
 acceleration = [0.02]
 pressure = [atmo.pressure[0]]
 volume = [balloon.mols*R*atmo.temperature[0]/atmo.pressure[0]]
 burst = False
 
 while t[-1] < endTime and altitude[-1]>-1:
+    timeStep = 1
     
-    timeStep = 0.2
-    if abs(acceleration[-1])<0.001:
+    if abs(acceleration[-1])<0.001 and velocity[-1]>0.05:
         timeStep = 3
+    #elif
     
-
     atmo = Atmosphere(altitude[-1])
 
     if not burst:
@@ -57,7 +58,7 @@ while t[-1] < endTime and altitude[-1]>-1:
             burstTime = t[-1]
             burst = True
     
-    drag = 0.8*0.5* atmo.density[0]*velocity[-1]**2*(volume[-1]*0.75/math.pi)**(1/3)
+    drag = 0.8*0.5* atmo.density[0]*velocity[-1]*abs(velocity[-1])*(volume[-1]*0.75/math.pi)**(1/3)
     Force = volume[-1]*atmo.density[0] - balloon.mols*balloon.mw - balloon.mass - drag
     if burst:
         drag = 0.8*0.5* atmo.density[0]*velocity[-1]**2*(0.01*0.75/math.pi)**(1/3)
