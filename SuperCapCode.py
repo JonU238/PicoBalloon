@@ -10,9 +10,7 @@ import microcontroller
 
 print("Imported libs")
 
-freqCorrection = -730
-
-WSPRTONESETTINGS = ([15,0,0,26,601405+freqCorrection,1000000],[15,0,0,26,601402+freqCorrection,1000000],[15,0,0,26,601399+freqCorrection,1000000],[15,0,0,26,601396+freqCorrection,1000000])
+WSPRTONESETTINGS = ([15,0,0,26,601405,1000000],[15,0,0,26,601402,1000000],[15,0,0,26,601399,1000000],[15,0,0,26,601396,1000000])
 SYMBOL_PERIOD = 0.683  # seconds per WSPR symbol
 
 callsign = u"KC1MOL"
@@ -64,7 +62,7 @@ def timeToWait(min, sec,lastgpstime):
         #return 120*2+(60-sec)
         #return 1
     
-def getState(gps):
+def getState(v,gps):
     try:
         if gps.altitude_m is None:
             state0 = "0"
@@ -83,48 +81,63 @@ def getState(gps):
     return int(state0+"0")
 
 
-def aquireGPS(powerPin,gps):
+def aquireGPS(powerPin,gps,bvolt,bvlowpoint):
+    powerPin.value = True
     time.sleep(1)
     #gps.send_command(b"PMTK314,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0")
+    time.sleep(1)
     gps.update()
     has_fix = False
-    while(not has_fix):
-        print("Gps update",gps.update())
-        print("alt:",gps.latitude)
-        print("time",gps.timestamp_utc)
-        if(gps.latitude != None and gps.timestamp_utc != None):
-            has_fix = True
-    
+    while(bvolt.value>bvlowpoint and not has_fix):
+        print(gps.update())
+        cline = gps.readline().decode()
+        if "$GNGGA" in cline:
+            cline = cline.split(',')
+            print(cline)
+            gps.altitude_m = cline[9]
+            print(gps.altitude_m)
+            if cline[6] == '1':
+                has_fix = True
+        time.sleep(0.1)
+    powerPin.value = False
     return gps.latitude,gps.longitude
 
-
-def transmitTelem(powerPin,gps,lastgpstime):
-    state = getState(gps)
+def transmitTelem(powerPin,gps,bvolt,lastgpstime):
+    state = getState(bvolt.value,gps)
     try:
         location = latlon_to_grid(gps.latitude,gps.longitude)
     except:
         location = latlon_to_grid(0.0,0.0)
 
     sequence = WSPRencode.wspr_encode(callsign,location,state)
-    print(timeToWait(gps.timestamp_utc.tm_min,gps.timestamp_utc.tm_sec,lastgpstime))
     time.sleep(timeToWait(gps.timestamp_utc.tm_min,gps.timestamp_utc.tm_sec,lastgpstime)-4)
+    powerPin.value = True
     time.sleep(4)
     i2c = busio.I2C(board.SCL, board.SDA)
     radio = adafruit_si5351.SI5351(i2c)
     radio.pll_a.configure_integer(15)
     radio.outputs_enabled = True
     transmit_sequence(sequence,radio)
+    powerPin.value = False
 
+    
+
+#bvsetpoint = Bvolttoval(4.5)
+bvsetpoint = Bvolttoval(4)
+bvlowpoint = Bvolttoval(3)
 
 #Turing the Power bus off by default
 powerPin = digitalio.DigitalInOut(board.VCC_OFF)
 powerPin.direction = digitalio.Direction.OUTPUT
-powerPin.value = True
-
-
+powerPin.value = False
 
 led = digitalio.DigitalInOut(board.LED)
 led.direction = digitalio.Direction.OUTPUT
+
+
+
+#Setting up the reading the bat voltage
+bvolt = analogio.AnalogIn(board.P0_02)
 
 
 #GPS setup
@@ -132,14 +145,17 @@ uart = busio.UART(board.TX, board.RX, baudrate=9600, timeout=10)
 gps = adafruit_gps.GPS(uart, debug=False)
 
 
-
 lastgpstime = -5*60*60
 
 while True:
+    led.value = True
+    print("Loop Started")
+    print(valtoBvolt(bvolt.value))
     try:
-        if time.monotonic()-lastgpstime>1*60*60:
+        if bvolt.value>bvsetpoint and time.monotonic()-lastgpstime>2*60*60:
             print("trying to aquire gps")
-            aquireGPS(powerPin,gps)
+            aquireGPS(powerPin,gps,bvolt,bvlowpoint)
+            
             if gps.latitude == None:
                 print("didnt get gps:(")
             else:
@@ -149,8 +165,21 @@ while True:
         print(e)
     
     try:
-        print("Sending wspr")
-        transmitTelem(powerPin,gps,lastgpstime)
+        if bvolt.value>bvsetpoint:
+            print("Sending wspr")
+            transmitTelem(powerPin,gps,bvolt,lastgpstime)
                 
     except Exception as e:
         print(e)
+    led.value = False
+    print("Im Going to sleep")
+    time.sleep(15)
+
+
+'''
+My journy throught the air is destend to end in tragety... yet i go fourth into the great unknown because i can....
+despite the fear i feel for the water of the sky or the water of the ground i trust my plastic will protect me and my gps will guide me
+PLS if you find this... call me, ill pay you to send it back to me
+Phone: 5086546807
+Gmail: jamestfishes@gmail.com
+'''
